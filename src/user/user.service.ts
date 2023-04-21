@@ -6,12 +6,14 @@ import { IUser } from './interface/IUser';
 import { EGetDynamically } from './enum/getDynamicallyUser';
 
 import { PrismaService } from '../core';
+import * as fs from 'fs';
+import { CreatePetDto } from '../pet/dto/pet.dto';
 
 @Injectable()
 export class UserService {
   public async getDynamicallyUser(
     typeOfDynamic: EGetDynamically,
-    data: number | string,
+    data: string,
     dbField: 'id' | 'email',
   ): Promise<User | void> {
     try {
@@ -47,7 +49,7 @@ export class UserService {
     } catch (e) {}
   }
 
-  public async getById(id: number): Promise<IUser> {
+  public async getById(id: string): Promise<IUser> {
     try {
       const foundUser = await this.prismaService.user.findUnique({
         where: { id },
@@ -70,7 +72,7 @@ export class UserService {
     }
   }
 
-  public async delete(id: number): Promise<void> {
+  public async delete(id: string): Promise<void> {
     try {
       await this.getDynamicallyUser(EGetDynamically.NEXT, id, 'id');
 
@@ -80,7 +82,7 @@ export class UserService {
     }
   }
 
-  public async update(id: number, user: UpdateUserDto): Promise<void> {
+  public async update(id: string, user: UpdateUserDto): Promise<void> {
     try {
       await this.getDynamicallyUser(EGetDynamically.NEXT, id, 'id');
 
@@ -100,15 +102,25 @@ export class UserService {
     }
   }
 
-  public async uploadAvatar(userId: number, path: string): Promise<User> {
+  public async uploadAvatar(userId: string, path: string): Promise<User> {
     try {
       const foundUser = await this.prismaService.user.findUnique({
         where: { id: userId },
       });
 
       if (!foundUser) {
-        // await fs.unlink(path);
+        await fs.unlink(path, (err) => {
+          if (err) {
+            throw new HttpException(err.message, 400);
+          }
+        });
         throw new HttpException('User not found', 400);
+      } else if (foundUser.avatar) {
+        await fs.unlink(foundUser.avatar, (err) => {
+          if (err) {
+            throw new HttpException(err.message, 400);
+          }
+        });
       }
 
       return await this.prismaService.user.update({
@@ -117,6 +129,43 @@ export class UserService {
         },
         data: {
           avatar: path,
+        },
+      });
+    } catch (e) {
+      throw new HttpException(e.message, e.status);
+    }
+  }
+
+  public async createAnimal(id: string, body: CreatePetDto): Promise<any> {
+    try {
+      await this.getDynamicallyUser(EGetDynamically.NEXT, id, 'id');
+
+      await this.prismaService.user.update({
+        where: { id },
+        data: {
+          pets: {
+            create: {
+              name: body.name,
+              age: body.age,
+              breed: body.breed,
+            },
+          },
+        },
+      });
+
+      return await this.prismaService.user.findUnique({
+        where: {
+          id: id,
+        },
+        include: {
+          pets: {
+            select: {
+              id: true,
+              name: true,
+              age: true,
+              breed: true,
+            },
+          },
         },
       });
     } catch (e) {

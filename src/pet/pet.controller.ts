@@ -1,24 +1,36 @@
-import { Body, Controller, HttpStatus, Param, Post, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  HttpStatus,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBody, ApiTags } from '@nestjs/swagger';
 import { PetService } from './pet.service';
 import { CreatePetDto } from './dto/pet.dto';
-import { User } from '@prisma/client';
+import { Pet } from '@prisma/client';
+import { AuthGuard } from '../auth/auth.guard';
 
 @ApiTags('pets')
 @Controller('pets')
 export class PetController {
   constructor(private readonly petService: PetService) {}
 
-  @Post(':userId')
+  @UseGuards(AuthGuard)
+  @Post()
+  @ApiBody({ type: CreatePetDto, required: true })
   async create(
+    @Req() req: any,
     @Res() res: any,
     @Body() body: CreatePetDto,
-    @Param('userId') id: number,
-  ): Promise<User> {
+  ): Promise<Pet> {
     try {
-      return res
-        .status(HttpStatus.CREATED)
-        .json(await this.petService.create(body, id));
+      const tokenInfo = req.user.tokenInfo;
+      const pet = await this.petService.create(body, tokenInfo.id);
+
+      return res.status(HttpStatus.CREATED).json(pet);
     } catch (e) {}
   }
 }

@@ -3,9 +3,7 @@ import {
   ExecutionContext,
   HttpException,
   Injectable,
-  UnauthorizedException,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
 import { JwtService } from '@nestjs/jwt';
 import { configs } from '../core/config';
 import { PrismaService } from '../core';
@@ -17,9 +15,7 @@ export class AuthGuard implements CanActivate {
     private prismaService: PrismaService,
   ) {}
 
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
       const request = context.switchToHttp().getRequest();
       const token = request.headers.authorization;
@@ -32,7 +28,7 @@ export class AuthGuard implements CanActivate {
         secret: configs.TOKENS.TOKEN_SECRET_KEY,
       });
 
-      const tokenInfo = this.prismaService.token.findFirst({
+      const tokenInfo = await this.prismaService.token.findFirst({
         where: { accessToken: token },
       });
 

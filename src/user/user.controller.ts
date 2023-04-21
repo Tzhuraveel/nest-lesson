@@ -1,4 +1,3 @@
-import { join } from 'path';
 import {
   Body,
   Controller,
@@ -7,7 +6,6 @@ import {
   HttpException,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Res,
@@ -16,7 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { diskStorage } from 'multer';
-import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { UpdateUserDto } from './dto/user.dto';
 import { UserService } from './user.service';
@@ -24,6 +22,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { editFileName, fileFilter } from '../core';
 import { RegisterDto } from '../auth/dto/auth.dto';
 import { AuthGuard } from '../auth/auth.guard';
+import { isMongoId } from 'class-validator';
+import { CreatePetDto } from '../pet/dto/pet.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -49,7 +49,8 @@ export class UserController {
   }
 
   @Get(':userId')
-  async getById(@Res() res: any, @Param('userId', ParseIntPipe) id: number) {
+  @ApiResponse({ type: RegisterDto })
+  async getById(@Res() res: any, @Param('userId') id: string) {
     try {
       const user = await this.userService.getById(id);
 
@@ -67,8 +68,14 @@ export class UserController {
 
   @UseGuards(AuthGuard)
   @Delete(':userId')
-  async delete(@Res() res: any, @Param('userId', ParseIntPipe) id: number) {
+  async delete(@Res() res: any, @Param('userId') id: string) {
     try {
+      const result = isMongoId(id);
+
+      if (!result) {
+        throw new HttpException('Id not valid', 400);
+      }
+
       await this.userService.delete(id);
 
       return res
@@ -85,10 +92,11 @@ export class UserController {
     }
   }
 
+  @UseGuards(AuthGuard)
   @Patch(':userId')
   async update(
     @Res() res: any,
-    @Param('userId', ParseIntPipe) id: number,
+    @Param('userId') id: string,
     @Body() body: UpdateUserDto,
   ) {
     try {
@@ -106,7 +114,17 @@ export class UserController {
     }
   }
 
+  @UseGuards(AuthGuard)
   @Post('/upload/avatar/:userId')
+  @ApiConsumes('multipart/form-data')
+  @ApiHeader({
+    name: 'accessToken',
+    description: 'Access token to endpoints is closed',
+  })
+  @ApiHeader({
+    name: 'avatar',
+    description: 'Token access to closed endpoints',
+  })
   @UseInterceptors(
     FileInterceptor('avatar', {
       storage: diskStorage({ destination: './public', filename: editFileName }),
@@ -115,15 +133,49 @@ export class UserController {
   )
   async uploadAvatar(
     @UploadedFile() file: Express.Multer.File,
-    @Param('userId', ParseIntPipe) userId: number,
+    @Param('userId') id: string,
     @Res() res: any,
   ) {
     try {
-      const pathName = join('public', file.filename);
+      const result: boolean = isMongoId(id);
 
-      await this.userService.uploadAvatar(userId, pathName);
+      if (!result) {
+        throw new HttpException('Id not valid', 400);
+      }
+      const pathName = `public/${file.filename}`;
+
+      await this.userService.uploadAvatar(id, pathName);
 
       return res.status(HttpStatus.OK).sendStatus(HttpStatus.OK);
+    } catch (e) {
+      throw new HttpException(
+        {
+          status: e.status,
+          error: e.message,
+        },
+        e.status,
+      );
+    }
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('/animals/:userId')
+  async createAnimal(
+    @Res() res: any,
+    @Param('userId') id: string,
+    @Body() body: CreatePetDto,
+  ) {
+    try {
+      const result: boolean = isMongoId(id);
+      console.log('hello world');
+
+      if (!result) {
+        throw new HttpException('Id not valid', 400);
+      }
+
+      const pets = await this.userService.createAnimal(id, body);
+
+      return res.status(HttpStatus.OK).json(pets);
     } catch (e) {
       throw new HttpException(
         {

@@ -5,12 +5,10 @@ import {
   HttpStatus,
   Post,
   Res,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiBody, ApiTags } from '@nestjs/swagger';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { AuthService } from './auth.service';
-import { AuthGuard } from './auth.guard';
 
 @ApiTags('auth')
 @Controller('auth')
