@@ -29,7 +29,6 @@ export class PetController {
     try {
       const tokenInfo = req.user.tokenInfo;
       const pet = await this.petService.create(body, tokenInfo.id);
-
       return res.status(HttpStatus.CREATED).json(pet);
     } catch (e) {}
   }
